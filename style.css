@@ -1,301 +1,122 @@
-/* ── Reset & Base ───────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 
-body {
-  font-family: "Segoe UI", Arial, sans-serif;
-  background: #f0f2f8;
-  color: #1a1a2e;
-  min-height: 100vh;
-}
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-/* ── Header ─────────────────────────────────────────────────── */
-header {
-  background: linear-gradient(135deg, #2d60b8, #1e4a9a);
-  color: white;
-  text-align: center;
-  padding: 36px 20px 28px;
-}
-header h1 { font-size: 2rem; margin-bottom: 8px; letter-spacing: 1px; }
-header p  { font-size: 0.95rem; opacity: 0.85; }
+  try {
+    const { role, type, sections, userName, userInstitution,
+            academicYear, subjects, pageSize, orientation } = req.body;
 
-/* ── Main / Card ─────────────────────────────────────────────── */
-main {
-  display: flex;
-  justify-content: center;
-  padding: 40px 16px 60px;
-}
+    if (!userName || !sections?.length) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
 
-.card {
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.09);
-  padding: 36px 40px;
-  width: 100%;
-  max-width: 620px;
-}
+    const PAGE_SIZES = {
+      A4:         [595, 842],
+      A3:         [842, 1191],
+      A5:         [420, 595],
+      Letter:     [612, 792],
+      LetterLand: [792, 612],
+      Legal:      [612, 1008],
+    };
 
-/* ── Step Title ──────────────────────────────────────────────── */
-.step-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #2d60b8;
-  margin-bottom: 20px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #e8edf8;
-}
+    let [W, H] = PAGE_SIZES[pageSize] || PAGE_SIZES["A4"];
+    if (orientation === "landscape") [W, H] = [H, W];
 
-/* ── Role Grid ───────────────────────────────────────────────── */
-.role-grid, .type-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
-}
+    const pdfDoc      = await PDFDocument.create();
+    const boldFont    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-.role-btn, .type-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 24px 16px;
-  background: #f5f7ff;
-  border: 2px solid #d0d5e8;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+    const info = { userName, userInstitution, academicYear, subjects, role, type };
 
-.role-icon { font-size: 2rem; }
-.role-btn span:last-child,
-.type-btn span:last-child { font-size: 0.95rem; }
+    const C = {
+      primary : rgb(0.18, 0.38, 0.72),
+      light   : rgb(0.90, 0.93, 0.98),
+      muted   : rgb(0.5,  0.5,  0.5),
+      dark    : rgb(0.1,  0.1,  0.1),
+      white   : rgb(1,    1,    1),
+      yellow  : rgb(0.99, 0.95, 0.75),
+      pink    : rgb(0.98, 0.88, 0.93),
+      gray    : rgb(0.95, 0.95, 0.95),
+    };
 
-.role-btn:hover, .type-btn:hover {
-  background: #dbeafe;
-  border-color: #2d60b8;
-  color: #2d60b8;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(45,96,184,0.15);
-}
+    function hLine(page, y, x1, x2, color = C.muted, thickness = 0.5) {
+      page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness, color });
+    }
 
-.role-btn.selected, .type-btn.selected {
-  background: #2d60b8;
-  border-color: #2d60b8;
-  color: white;
-}
+    function vLine(page, x, y1, y2, color = C.muted, thickness = 0.5) {
+      page.drawLine({ start: { x, y: y1 }, end: { x, y: y2 }, thickness, color });
+    }
 
-/* ── Section Grid ────────────────────────────────────────────── */
-.section-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-  max-height: 420px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
+    function rect(page, x, y, w, h, color) {
+      page.drawRectangle({ x, y, width: w, height: h, color });
+    }
 
-.section-grid::-webkit-scrollbar { width: 6px; }
-.section-grid::-webkit-scrollbar-track { background: #f0f2f8; border-radius: 4px; }
-.section-grid::-webkit-scrollbar-thumb { background: #2d60b8; border-radius: 4px; }
+    function txt(page, text, x, y, size, font, color = C.dark) {
+      try {
+        page.drawText(String(text), { x, y, size, font, color });
+      } catch(e) {}
+    }
 
-.section-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #f5f7ff;
-  border: 1.5px solid #d0d5e8;
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+    function addHeader(page, title, userName, boldFont, regularFont, W, H) {
+      rect(page, 0, H - 52, W, 52, C.primary);
+      txt(page, title, 36, H - 34, 16, boldFont, C.white);
+      txt(page, userName, W - 180, H - 34, 9, regularFont, C.white);
+      hLine(page, H - 58, 36, W - 36, C.muted, 0.3);
+      txt(page, "Title: _______________________    Date: _______________",
+        36, H - 58, 8, regularFont, C.muted);
+    }
 
-.section-item:hover { border-color: #2d60b8; background: #eef2ff; }
-.section-item.selected { background: #dbeafe; border-color: #2d60b8; }
+    function addSection(id, pdfDoc, info, boldFont, regularFont, W, H) {
+      const page = pdfDoc.addPage([W, H]);
+      addHeader(page, id.replace(/_/g, " ").toUpperCase(), info.userName, boldFont, regularFont, W, H);
+      const m = 36;
+      let y = H - 75;
+      for (let i = 0; i < 25; i++) {
+        hLine(page, y - i * 26, m, W - m, C.muted, 0.4);
+      }
+    }
 
-.section-item input[type="checkbox"] {
-  accent-color: #2d60b8;
-  width: 17px;
-  height: 17px;
-  flex-shrink: 0;
-}
+    // Cover Page
+    const cover = pdfDoc.addPage([W, H]);
+    rect(cover, 0, 0, W, H, C.primary);
+    rect(cover, 24, 24, W - 48, H - 48, C.white);
+    rect(cover, 24, H - 90, W - 48, 66, C.primary);
+    txt(cover, "PLANNER GENERATOR", W / 2 - 80, H - 58, 18, boldFont, C.white);
+    txt(cover, (role || "").toUpperCase(), W / 2 - 30, H - 76, 10, regularFont, C.white);
+    hLine(cover, H - 110, 60, W - 60, C.primary, 2);
+    txt(cover, userName, W / 2 - 60, H - 145, 18, boldFont, C.dark);
+    txt(cover, userInstitution || "", W / 2 - 60, H - 170, 11, regularFont, C.muted);
+    txt(cover, academicYear || "", W / 2 - 40, H - 190, 10, regularFont, C.muted);
+    hLine(cover, H - 210, 60, W - 60, C.muted, 0.5);
+    txt(cover, "SECTIONS INCLUDED:", 60, H - 230, 9, boldFont, C.primary);
+    let sy = H - 248;
+    sections.forEach((s, i) => {
+      txt(cover, "- " + s.replace(/_/g, " ").toUpperCase(),
+        60 + (i % 2 === 0 ? 0 : W / 2 - 60), sy, 8, regularFont, C.dark);
+      if (i % 2 === 1) sy -= 14;
+    });
+    hLine(cover, 80, 60, W - 60, C.muted, 0.5);
+    txt(cover, "Compatible with iPad, Tablets, iPhone & Smartphones",
+      W / 2 - 115, 62, 8, regularFont, C.muted);
+    txt(cover, "Generated by Planner Generator  -  " + new Date().toLocaleDateString(),
+      W / 2 - 100, 46, 8, regularFont, C.muted);
 
-.section-icon { font-size: 1.3rem; }
-.section-name { font-weight: 600; font-size: 0.92rem; }
-.section-desc { font-size: 0.78rem; color: #666; margin-top: 2px; }
+    // Content Pages
+    sections.forEach(id => {
+      addSection(id, pdfDoc, info, boldFont, regularFont, W, H);
+    });
 
-/* ── Form Groups ─────────────────────────────────────────────── */
-.form-group { margin-bottom: 20px; }
+    const pdfBytes = await pdfDoc.save();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition",
+      `attachment; filename=planner-${userName.replace(/\s+/g, "_")}.pdf`);
+    res.send(Buffer.from(pdfBytes));
 
-.form-group label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 8px;
-  font-size: 0.95rem;
-  color: #2d60b8;
-}
-
-input[type="text"],
-input[type="number"] {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1.5px solid #d0d5e8;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: border-color 0.2s;
-  outline: none;
-}
-
-input[type="text"]:focus,
-input[type="number"]:focus { border-color: #2d60b8; }
-
-/* ── PDF Options Box ─────────────────────────────────────────── */
-.pdf-options-box {
-  background: #f5f7ff;
-  border: 1.5px solid #d0d5e8;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-/* ── Options Grid (radio) ────────────────────────────────────── */
-.options-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.option-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: white;
-  border: 1.5px solid #d0d5e8;
-  border-radius: 8px;
-  padding: 7px 12px;
-  cursor: pointer;
-  font-size: 0.88rem;
-  transition: all 0.2s;
-}
-
-.option-label:hover { border-color: #2d60b8; }
-.option-label:has(input:checked) {
-  background: #dbeafe;
-  border-color: #2d60b8;
-  font-weight: 600;
-  color: #2d60b8;
-}
-
-input[type="radio"] { accent-color: #2d60b8; }
-
-/* ── Subjects ────────────────────────────────────────────────── */
-#subjectList { display: flex; flex-direction: column; gap: 10px; }
-
-.subject-row { display: flex; gap: 8px; align-items: center; }
-.subject-row input { flex: 1; }
-
-.btn-remove {
-  background: #fee2e2;
-  color: #dc2626;
-  border: none;
-  border-radius: 6px;
-  width: 34px;
-  height: 34px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.2s;
-}
-.btn-remove:hover { background: #fecaca; }
-
-.btn-add {
-  margin-top: 10px;
-  background: none;
-  color: #2d60b8;
-  border: 1.5px dashed #2d60b8;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  width: 100%;
-  transition: background 0.2s;
-}
-.btn-add:hover { background: #eef2ff; }
-
-/* ── Navigation ──────────────────────────────────────────────── */
-.nav-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 16px;
-  margin-bottom: 8px;
-}
-
-.btn-back {
-  background: none;
-  color: #2d60b8;
-  border: 1.5px solid #2d60b8;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-back:hover { background: #eef2ff; }
-
-.btn-next {
-  background: #2d60b8;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 24px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-next:hover { background: #1e4a9a; }
-
-/* ── Generate Button ─────────────────────────────────────────── */
-.btn-generate {
-  width: 100%;
-  padding: 15px;
-  background: linear-gradient(135deg, #2d60b8, #1e4a9a);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 16px;
-  transition: all 0.2s;
-  letter-spacing: 0.5px;
-}
-.btn-generate:hover    { opacity: 0.92; transform: translateY(-1px); }
-.btn-generate:active   { transform: scale(0.98); }
-.btn-generate:disabled { background: #93afd8; cursor: not-allowed; transform: none; }
-
-/* ── Compatible Note ─────────────────────────────────────────── */
-.compatible-note {
-  text-align: center;
-  font-size: 0.8rem;
-  color: #888;
-  margin-top: 12px;
-}
-
-/* ── Error ───────────────────────────────────────────────────── */
-.error {
-  color: #dc2626;
-  background: #fee2e2;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 0.9rem;
-  margin-top: 12px;
-}
-
-/* ── Utility ─────────────────────────────────────────────────── */
-.hidden { display: none; }
+  } catch (err) {
+    console.error("PDF error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
