@@ -867,11 +867,11 @@ app.post("/generate-pdf", (req, res) => {
       `attachment; filename=planner-${userName.replace(/\s+/g, "_")}.pdf`);
     res.send(Buffer.from(pdfBytes));
 
-  } catch (err) {
+  
     console.error("PDF error:", err.message);
     res.status(500).json({ error: err.message });
-  }
-});
+
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
