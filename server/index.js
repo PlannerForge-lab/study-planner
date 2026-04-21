@@ -811,8 +811,9 @@ function addSection(id, pdfDoc, info, boldFont, regularFont, W, H) {
 }
 
 // ── POST /generate-pdf ─────────────────────────────────────────
-app.post("/generate-pdf", async (req, res) => {
-  try {
+app.post("/generate-pdf", (req, res) => {
+  res.json({ message: "API is working" });
+});
     const { role, type, sections, userName, userInstitution,
             academicYear, subjects, pageSize, orientation } = req.body;
 
