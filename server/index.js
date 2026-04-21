@@ -871,6 +871,7 @@ app.post("/generate-pdf", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log("Server running at http://localhost:" + PORT);
