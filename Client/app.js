@@ -182,7 +182,7 @@ async function generatePDF() {
   btnText.textContent = "Generating your planner...";
 
   try {
-    const response = await fetch("/generate-pdf", {
+   const response = await fetch("https://study-planner-production-c714.up.railway.app/generate-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
