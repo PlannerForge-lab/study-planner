@@ -824,9 +824,6 @@ app.post("/generate-pdf", (req, res) => {
     let [W, H] = PAGE_SIZES[pageSize] || PAGE_SIZES["A4"];
     if (orientation === "landscape") [W, H] = [H, W];
 
-    const pdfDoc      = await PDFDocument.create();
-    const boldFont    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
     const info = { userName, userInstitution, academicYear, subjects, role, type };
 
@@ -861,7 +858,7 @@ app.post("/generate-pdf", (req, res) => {
       addSection(id, pdfDoc, info, boldFont, regularFont, W, H);
     });
 
-    const pdfBytes = await pdfDoc.save();
+   
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition",
       `attachment; filename=planner-${userName.replace(/\s+/g, "_")}.pdf`);
